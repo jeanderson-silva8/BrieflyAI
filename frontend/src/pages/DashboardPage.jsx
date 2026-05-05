@@ -80,10 +80,7 @@ export default function DashboardPage() {
             <p>Transcreva reuniões e gere insights automáticos com IA</p>
           </motion.div>
           <motion.div className="dashboard-header-right" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <div className="header-search">
-              <Search size={16} />
-              <input type="text" placeholder="Buscar..." />
-            </div>
+
             <div className="header-icon-btn">
               <Calendar size={16} />
             </div>

@@ -124,10 +124,12 @@ textarea.input-field{resize:vertical;min-height:120px;line-height:1.7}
 
 /* Main Content */
 .main-content{flex:1;margin-left:300px;display:flex;flex-direction:column;position:relative;z-index:1;overflow:hidden}
-.dashboard-header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 2rem}
-.dashboard-header-left h1{font-size:1.75rem;font-weight:700;color:#fff;letter-spacing:-0.02em;margin:0}
+.dashboard-header{display:flex;align-items:flex-start;justify-content:space-between;padding:1.25rem 2rem;gap:1.5rem;flex-wrap:wrap}
+.dashboard-header-left{flex:1;min-width:260px}
+.dashboard-header-left h1{font-size:1.75rem;font-weight:700;color:#fff;letter-spacing:-0.02em;margin:0;white-space:nowrap}
 .dashboard-header-left p{font-size:0.85rem;color:#5a7fa8;margin:0.25rem 0 0}
-.dashboard-header-left .breadcrumb{display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:#5a7fa8;margin-bottom:0.35rem}
+.dashboard-header-left .breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:0.4rem;font-size:0.75rem;color:#5a7fa8;margin-bottom:0.35rem}
+.dashboard-header-left .breadcrumb span{white-space:nowrap}
 .dashboard-header-left .breadcrumb .current{color:#93c5fd}
 .dashboard-header-right{display:flex;align-items:center;gap:1rem}
 .header-search{position:relative}
@@ -290,7 +292,9 @@ textarea.input-field{resize:vertical;min-height:120px;line-height:1.7}
   .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:19;opacity:0;pointer-events:none;transition:opacity 0.3s}
   .sidebar-overlay.visible{opacity:1;pointer-events:all}
   .main-content{margin-left:0}.menu-toggle{display:flex}
-  .dashboard-header{padding:1rem}.dashboard-body{padding:0 1rem 1rem}
+  .dashboard-header{padding:1.5rem 1rem;flex-direction:column;align-items:flex-start;gap:1.25rem}
+  .dashboard-header-right{width:100%;justify-content:flex-start;flex-wrap:wrap}
+  .dashboard-body{padding:0 1rem 1rem}
   .dashboard-columns{flex-direction:column}.dashboard-right{width:100%}
   .auth-container{max-width:100%}.auth-header h1{font-size:1.8rem}
 }
