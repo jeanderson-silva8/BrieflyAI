@@ -1,0 +1,25 @@
+# Dependências
+node_modules/
+
+# ═══════════════════════════════════════════════════════
+# 🛡️ PROTOCOLO DE SEGURANÇA — NUNCA COMMITAR
+# ═══════════════════════════════════════════════════════
+.env
+.env.local
+.env.production
+.env.*.local
+**/.env
+
+# Build e Cache
+dist/
+build/
+.tmp/
+
+# Sistema
+.DS_Store
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/

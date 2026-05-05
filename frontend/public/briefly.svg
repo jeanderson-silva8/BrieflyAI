@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pillGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="pillStroke" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.8)" />
+      <stop offset="50%" stop-color="rgba(255,255,255,0.1)" />
+      <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+    </linearGradient>
+  </defs>
+  <g transform="rotate(-40 32 32)">
+    <rect x="22" y="16" width="36" height="14" rx="7" fill="url(#pillGrad)" stroke="url(#pillStroke)" stroke-width="1.5" />
+    <rect x="6" y="34" width="36" height="14" rx="7" fill="url(#pillGrad)" stroke="url(#pillStroke)" stroke-width="1.5" />
+  </g>
+</svg>

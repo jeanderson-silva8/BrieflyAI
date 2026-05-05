@@ -1,0 +1,237 @@
+# BrieflyAI — Resumidor Inteligente com IA em Tempo Real
+
+Construção completa de um Micro-SaaS Full Stack com streaming de IA (SSE), autenticação JWT, histórico em MongoDB e rate limiting. O projeto substitui o "Miniatura Forja AI" no portfólio.
+
+## Proposed Changes
+
+### 1. Scaffolding do Projeto
+
+#### [NEW] `PJ-BrieflyAI/`
+Criar a pasta raiz na Área de Trabalho com a seguinte estrutura:
+
+```text
+PJ-BrieflyAI/
+├── frontend/          # React 19 + Vite
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── LoginForm.jsx
+│   │   │   ├── RegisterForm.jsx
+│   │   │   ├── SummaryInput.jsx
+│   │   │   ├── StreamingOutput.jsx
+│   │   │   ├── ChatWithDoc.jsx
+│   │   │   ├── HistorySidebar.jsx
+│   │   │   └── UsageMeter.jsx
+│   │   ├── pages/
+│   │   │   ├── AuthPage.jsx
+│   │   │   └── DashboardPage.jsx
+│   │   ├── hooks/
+│   │   │   ├── useAuth.js
+│   │   │   └── useStream.js
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── index.html
+│   └── package.json
+│
+├── backend/
+│   ├── routes/
+│   │   ├── auth.js          # POST /register, POST /login
+│   │   ├── summarize.js     # POST /api/summarize (SSE streaming)
+│   │   ├── chat.js          # POST /api/chat (SSE streaming)
+│   │   └── history.js       # GET /api/history, GET /api/history/:id
+│   ├── middleware/
+│   │   ├── authMiddleware.js   # Verifica JWT em rotas protegidas
+│   │   └── rateLimiter.js      # Controla X resumos/dia por usuário
+│   ├── models/
+│   │   ├── User.js          # Schema: email, passwordHash, createdAt
+│   │   └── Summary.js       # Schema: userId, inputText, summary, actions, email, createdAt
+│   ├── server.js
+│   ├── .env.example
+│   └── package.json
+│
+└── README.md
+```
+
+---
+
+### 2. Backend (Node.js + Express)
+
+#### [NEW] `backend/server.js`
+- Express v5, cors, express.json()
+- Conexão com MongoDB Atlas via `mongoose`
+- Monta rotas: `/auth`, `/api/summarize`, `/api/chat`, `/api/history`
+
+#### [NEW] `backend/routes/auth.js`
+- `POST /register` — Cria usuário com `bcryptjs` hash
+- `POST /login` — Valida credenciais, retorna JWT (expiração 7d)
+
+#### [NEW] `backend/routes/summarize.js`
+- `POST /api/summarize` — Rota principal com **SSE streaming**
+- Recebe `{ text }` no body
+- Chama `groq.chat.completions.create({ stream: true })` com prompt estruturado que pede: Resumo, Ações, E-mail
+- Envia chunks via `res.write('data: ...\n\n')`
+- Ao final, salva o resultado completo no MongoDB (collection `summaries`)
+- Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`
+
+#### [NEW] `backend/routes/chat.js`
+- `POST /api/chat` — Chat com o documento
+- Recebe `{ question, context }` no body
+- Envia o contexto original + pergunta para a Groq com streaming
+- Retorna resposta via SSE
+
+#### [NEW] `backend/routes/history.js`
+- `GET /api/history` — Lista resumos do usuário autenticado (últimos 20, ordenados por data)
+- `GET /api/history/:id` — Retorna um resumo específico completo
+
+#### [NEW] `backend/middleware/authMiddleware.js`
+- Extrai token do header `Authorization: Bearer <token>`
+- Verifica com `jsonwebtoken`, injeta `req.userId`
+
+#### [NEW] `backend/middleware/rateLimiter.js`
+- Consulta MongoDB: quantos resumos o usuário fez hoje
+- Se >= 5 (limite free), retorna `429 Too Many Requests`
+- Retorna headers `X-RateLimit-Remaining` e `X-RateLimit-Limit`
+
+#### [NEW] `backend/models/User.js`
+```javascript
+{ email, passwordHash, createdAt }
+```
+
+#### [NEW] `backend/models/Summary.js`
+```javascript
+{ userId, inputText, summaryResult, createdAt }
+```
+
+**Dependências backend:** `express`, `cors`, `mongoose`, `bcryptjs`, `jsonwebtoken`, `groq-sdk`, `dotenv`
+
+---
+
+### 3. Frontend (React 19 + Vite)
+
+#### [NEW] `frontend/src/index.css`
+Design system premium dark mode:
+- Fundo principal: `#0a0a0f` (preto-azulado profundo)
+- Acento: `#6C63FF` (roxo vibrante) + `#00D9FF` (ciano)
+- Tipografia: Inter (Google Fonts)
+- Cards com glassmorphism (`backdrop-filter: blur`)
+- Bordas arredondadas (`2rem`)
+- Animações suaves, transições em `cubic-bezier`
+
+#### [NEW] `frontend/src/context/AuthContext.jsx`
+- Context React para gerenciar estado de autenticação
+- Armazena token JWT no localStorage
+- Provê `login()`, `register()`, `logout()`, `user`, `isAuthenticated`
+
+#### [NEW] `frontend/src/hooks/useStream.js`
+- Hook customizado para consumir SSE via `fetch` + `ReadableStream`
+- Retorna `{ data, isStreaming, error, startStream }`
+- Parseia chunks `data: {...}\n\n` em tempo real
+- Atualiza estado React a cada chunk recebido
+
+#### [NEW] `frontend/src/hooks/useAuth.js`
+- Hook que consome o AuthContext
+- Facilita acesso a `user`, `login`, `logout` nos componentes
+
+#### [NEW] `frontend/src/pages/AuthPage.jsx`
+- Toggle entre Login e Registro
+- Formulários com validação
+- Redirect para Dashboard após sucesso
+
+#### [NEW] `frontend/src/pages/DashboardPage.jsx`
+- Layout principal com sidebar + área de conteúdo
+- Sidebar: `<HistorySidebar />` com lista de resumos anteriores
+- Centro: `<SummaryInput />` → `<StreamingOutput />` → `<ChatWithDoc />`
+- Topo: `<UsageMeter />` mostrando X/5 resumos restantes
+
+#### [NEW] `frontend/src/components/SummaryInput.jsx`
+- Textarea grande com placeholder "Cole sua transcrição aqui..."
+- Botão "✨ Resumir com IA" com animação magnética no hover
+- Validação (mínimo 50 caracteres)
+
+#### [NEW] `frontend/src/components/StreamingOutput.jsx`
+- **O componente mais importante visualmente**
+- 3 seções com abas: "📋 Resumo" | "✅ Ações" | "📧 E-mail"
+- Texto aparece caractere por caractere com cursor piscante na cor de acento
+- Skeleton loader antes do primeiro chunk chegar
+- Botão "Copiar" em cada seção
+
+#### [NEW] `frontend/src/components/ChatWithDoc.jsx`
+- Aparece após o resumo ser gerado
+- Campo de input: "Faça uma pergunta sobre o documento..."
+- Mensagens em bolhas (usuário vs IA)
+- Respostas também em streaming
+
+#### [NEW] `frontend/src/components/HistorySidebar.jsx`
+- Lista dos últimos 20 resumos do usuário
+- Cada item mostra: título truncado + data
+- Clicável: carrega o resumo completo na área principal
+
+#### [NEW] `frontend/src/components/UsageMeter.jsx`
+- Barra de progresso visual: "3/5 resumos usados hoje"
+- Muda de cor conforme se aproxima do limite (verde → amarelo → vermelho)
+- Tooltip com informação de reset
+
+#### [NEW] `frontend/src/components/LoginForm.jsx` e `RegisterForm.jsx`
+- Formulários estilizados com validação inline
+- Transição suave entre login e registro
+
+**Dependências frontend:** `react`, `react-dom`, `lucide-react`, `framer-motion`
+
+---
+
+### 4. Prompt Engineering (Groq)
+
+O prompt do sistema para a rota `/api/summarize` será estruturado assim:
+
+```
+Você é um assistente de reuniões corporativo ultra-eficiente.
+Receba a transcrição/texto abaixo e retorne EXATAMENTE neste formato:
+
+## 📋 RESUMO
+[Resumo estruturado em tópicos dos pontos-chave]
+
+## ✅ AÇÕES
+[Lista de tarefas extraídas com responsáveis e prazos, se mencionados]
+
+## 📧 E-MAIL DE FOLLOW-UP
+[Rascunho de e-mail profissional e breve resumindo a reunião para os participantes]
+```
+
+**Modelo:** `llama-3.3-70b-versatile` (melhor custo-benefício da Groq, gratuito)
+
+---
+
+### 5. Deploy
+
+- **Frontend:** Vercel (build estática do Vite)
+- **Backend:** Vercel Serverless Functions ou Render.com (para SSE, Render é mais confiável)
+- **Banco:** MongoDB Atlas (free tier, 512MB)
+
+---
+
+## Verificação
+
+### Testes Manuais
+1. Registrar um novo usuário → Login → Verificar JWT no localStorage
+2. Colar um texto longo → Clicar "Resumir" → Verificar streaming letra por letra
+3. Fazer 5 resumos → Verificar que o 6º é bloqueado (rate limit 429)
+4. Fazer uma pergunta no chat → Verificar resposta com streaming
+5. Recarregar a página → Verificar que o histórico persiste na sidebar
+6. Testar responsividade mobile
+
+### Testes de Arquitetura
+1. Verificar que a GROQ_API_KEY nunca é exposta no frontend (só no backend .env)
+2. Verificar headers SSE corretos no Network tab do DevTools
+3. Verificar que rotas protegidas retornam 401 sem token
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Você já tem uma API Key da Groq?** Se não, você precisa criar uma conta gratuita em [console.groq.com](https://console.groq.com) e gerar uma chave. É grátis e não pede cartão de crédito.
+
+> [!IMPORTANT]
+> **MongoDB Atlas:** Você já tem uma conta no MongoDB Atlas ou prefere que eu configure tudo com uma connection string nova?
