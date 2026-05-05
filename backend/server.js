@@ -21,10 +21,14 @@ const PORT = process.env.PORT || 3001;
 // [SEGURANÇA] Headers HTTP de proteção (Helmet)
 app.use(helmet());
 
-// [SEGURANÇA] CORS Restrito — Aceita APENAS o frontend autorizado
-const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'https://briefly-ai-nine.vercel.app'];
+// [SEGURANÇA] CORS Restrito — combina env var + URLs fixas (à prova de falhas)
+const FIXED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://briefly-ai-nine.vercel.app'
+];
+const envOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [];
+const allowedOrigins = [...new Set([...FIXED_ORIGINS, ...envOrigins])];
 
 app.use(cors({
   origin: function (origin, callback) {
