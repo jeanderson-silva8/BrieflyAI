@@ -4,6 +4,8 @@ import { MessageSquare, Send, User, Sparkles, Loader2, CheckSquare, Globe, Align
 import { useStream } from '../hooks/useStream';
 import { useAuth } from '../hooks/useAuth';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 export default function ChatWithDoc({ summaryId, initialMessages = [], context, visible }) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState(initialMessages);
@@ -36,7 +38,7 @@ export default function ChatWithDoc({ summaryId, initialMessages = [], context, 
   const saveChatToDB = async (updatedMessages) => {
     if (!summaryId) return;
     try {
-      await fetch(`http://localhost:3001/api/history/${summaryId}/chat`, {
+      await fetch(`${API_URL}/api/history/${summaryId}/chat`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ messages: updatedMessages })

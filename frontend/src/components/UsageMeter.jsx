@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Gauge } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const DAILY_LIMIT = 5;
 
 export default function UsageMeter() {

@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Wand2, FileText, Type, X, Mic, Upload, Loader2, Square } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 export default function SummaryInput({ onSubmit, isStreaming, disabled, text, onTextChange }) {
   const charCount = text.trim().length;
   const isValid = charCount >= 50;
@@ -23,7 +25,7 @@ export default function SummaryInput({ onSubmit, isStreaming, disabled, text, on
       const formData = new FormData();
       formData.append('audio', audioBlob, filename);
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/transcribe', {
+      const res = await fetch(`${API_URL}/api/transcribe`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData

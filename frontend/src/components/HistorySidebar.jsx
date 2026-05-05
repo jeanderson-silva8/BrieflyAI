@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Plus, LogOut, Settings, LayoutDashboard, History, FileText, Zap, ChevronDown, Trash2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, circle: 'icon-circle-blue' },
