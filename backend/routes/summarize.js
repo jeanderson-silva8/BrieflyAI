@@ -191,11 +191,13 @@ router.post('/', authMiddleware, rateLimiter, async (req, res) => {
           emoji: meta.emoji || '📄', 
           tags: meta.tags || [] 
         });
+      } catch (e) {
         // [SEGURANÇA] Log Seguro
         console.error('[SUMMARIZE] Erro na classificação de tags:', e.code || 'UNKNOWN');
       }
     })();
 
+  } catch (err) {
     // [SEGURANÇA] Log Seguro
     console.error('[SUMMARIZE] Erro no streaming:', err.code || 'UNKNOWN');
     const errorMsg = err.message?.includes('rate_limit') 

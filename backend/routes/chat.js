@@ -57,6 +57,7 @@ router.post('/', authMiddleware, async (req, res) => {
     res.write(`data: ${JSON.stringify({ content: '', done: true })}\n\n`);
     res.end();
 
+  } catch (err) {
     // [SEGURANÇA] Log Seguro
     console.error('[CHAT] Erro no chat:', err.code || 'UNKNOWN');
     res.write(`data: ${JSON.stringify({ error: 'Erro ao processar a pergunta', done: true })}\n\n`);
