@@ -24,7 +24,7 @@ app.use(helmet());
 // [SEGURANÇA] CORS Restrito — Aceita APENAS o frontend autorizado
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'https://briefly-ai-nine.vercel.app'];
 
 app.use(cors({
   origin: function (origin, callback) {
