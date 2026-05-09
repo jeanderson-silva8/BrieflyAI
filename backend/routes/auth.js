@@ -1,9 +1,24 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 
 const router = express.Router();
+
+// Garante que o banco está conectado antes de qualquer operação de auth
+function ensureDbReady(res) {
+  if (mongoose.connection.readyState !== 1) {
+    res.status(503).json({ error: 'Serviço temporariamente indisponível (DB offline). Tente novamente em instantes.' });
+    return false;
+  }
+  if (!process.env.JWT_SECRET) {
+    console.error('[AUTH] FATAL: JWT_SECRET não está definido no ambiente');
+    res.status(503).json({ error: 'Serviço de autenticação mal configurado' });
+    return false;
+  }
+  return true;
+}
 
 // ═══════════════════════════════════════════════════════
 // 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — AUTH (IAM)
@@ -30,6 +45,7 @@ function isValidPassword(password) {
  */
 router.post('/register', async (req, res) => {
   try {
+    if (!ensureDbReady(res)) return;
     const email = sanitizeString(req.body.email, 254).toLowerCase();
     const name = sanitizeString(req.body.name, 100);
     const password = req.body.password;
@@ -77,7 +93,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (err) {
     // [SEGURANÇA] Log Seguro — nunca expor detalhes internos
-    console.error('[AUTH] Erro no registro:', err.code || 'UNKNOWN');
+    console.error('[AUTH] Erro no registro:', err.name, '-', err.message);
     if (err.code === 11000) {
       return res.status(409).json({ error: 'Este e-mail já está cadastrado' });
     }
@@ -91,6 +107,7 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
+    if (!ensureDbReady(res)) return;
     const email = sanitizeString(req.body.email, 254).toLowerCase();
     const password = req.body.password;
 
@@ -121,7 +138,7 @@ router.post('/login', async (req, res) => {
       user: { id: user._id, email: user.email, name: user.name }
     });
   } catch (err) {
-    console.error('[AUTH] Erro no login:', err.code || 'UNKNOWN');
+    console.error('[AUTH] Erro no login:', err.name, '-', err.message);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

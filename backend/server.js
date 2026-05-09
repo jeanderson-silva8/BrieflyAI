@@ -14,6 +14,14 @@ const transcribeRoutes = require('./routes/transcribe');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// [BOOT] Validação de variáveis de ambiente críticas
+const REQUIRED_ENV = ['JWT_SECRET', 'MONGO_URI'];
+const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missingEnv.length) {
+  console.error(`[BOOT] FALTAM variáveis de ambiente: ${missingEnv.join(', ')}`);
+  console.error('[BOOT] Configure-as no painel do Render antes de prosseguir.');
+}
+
 // ═══════════════════════════════════════════════════════
 // 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — BRIEFLYAI
 // ═══════════════════════════════════════════════════════
@@ -30,12 +38,16 @@ const FIXED_ORIGINS = [
 const envOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [];
 const allowedOrigins = [...new Set([...FIXED_ORIGINS, ...envOrigins])];
 
+// Regex permite previews/deploys da Vercel do projeto BrieflyAI
+const VERCEL_PREVIEW_REGEX = /^https:\/\/briefly[\w-]*\.vercel\.app$/;
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || VERCEL_PREVIEW_REGEX.test(origin)) {
       return callback(null, true);
     }
+    console.warn('[CORS] Origem bloqueada:', origin);
     return callback(new Error('Bloqueado pela política de CORS'));
   },
   credentials: true
