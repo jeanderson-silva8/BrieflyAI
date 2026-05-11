@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('brieflyai_token'));
   const [loading, setLoading] = useState(true);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     const savedUser = localStorage.getItem('brieflyai_user');
@@ -49,6 +50,32 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const forgotPassword = async (email) => {
+    const res = await fetch(`${API_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao solicitar recuperação');
+    setSuccessMessage(data.message);
+    return data;
+  };
+
+  const resetPassword = async (token, password) => {
+    const res = await fetch(`${API_URL}/auth/reset-password/${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro ao redefinir senha');
+    setSuccessMessage(data.message);
+    return data;
+  };
+
+  const clearSuccess = () => setSuccessMessage('');
+
   const logout = () => {
     localStorage.removeItem('brieflyai_token');
     localStorage.removeItem('brieflyai_user');
@@ -57,8 +84,13 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ 
+      user, token, loading, login, register, logout, 
+      forgotPassword, resetPassword, successMessage, clearSuccess,
+      isAuthenticated: !!token 
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
+
