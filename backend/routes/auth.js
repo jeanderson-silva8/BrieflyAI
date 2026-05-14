@@ -3,11 +3,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
 const router = express.Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ═══════════════════════════════════════════════════════
+// 📧 Gmail SMTP — Envio de emails para QUALQUER destinatário
+// ═══════════════════════════════════════════════════════
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
 // Garante que o banco está conectado antes de qualquer operação de auth
 function ensureDbReady(res) {
@@ -148,7 +158,7 @@ router.post('/login', async (req, res) => {
 
 /**
  * POST /auth/forgot-password
- * Gera token de recuperação, salva hash no banco, envia email via Resend.
+ * Gera token de recuperação, salva hash no banco, envia email via Gmail SMTP.
  */
 router.post('/forgot-password', async (req, res) => {
   try {
@@ -182,11 +192,11 @@ router.post('/forgot-password', async (req, res) => {
     console.log(`   Email: ${email}`);
     console.log(`   URL: ${resetUrl}\n`);
 
-    // Envia email via Resend
+    // Envia email via Gmail SMTP (Nodemailer)
     try {
-      const { data, error: emailError } = await resend.emails.send({
-        from: 'BrieflyAI <onboarding@resend.dev>',
-        to: [email],
+      await transporter.sendMail({
+        from: `"BrieflyAI" <${process.env.GMAIL_USER}>`,
+        to: email,
         subject: '🔐 Recuperação de Senha — BrieflyAI',
         html: `
           <div style="max-width:520px;margin:0 auto;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0f;padding:40px 32px;border-radius:16px;border:1px solid rgba(108,99,255,0.2);">
@@ -207,11 +217,7 @@ router.post('/forgot-password', async (req, res) => {
         `
       });
 
-      if (emailError) {
-        console.error('[AUTH] Erro ao enviar email Resend:', emailError);
-      } else {
-        console.log(`📧 [PASSWORD RESET] Email enviado com sucesso via Resend (ID: ${data?.id})`);
-      }
+      console.log(`📧 [PASSWORD RESET] Email enviado com sucesso para: ${email}`);
     } catch (emailErr) {
       console.error('[AUTH] Falha ao enviar email:', emailErr.message);
       // Não falha a requisição — o link está no console como fallback

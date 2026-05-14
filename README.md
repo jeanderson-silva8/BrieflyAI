@@ -80,11 +80,12 @@ Acesse a aplicação em: `http://localhost:5173`
 └── README.md         # Documentação da arquitetura
 ```
 
-## 🤝 Autor
-**Jeanderson Silva** 😎🤌
+## 👑 Autor
 
-Desenvolvedor Full-Stack | Engenheiro Frontend | Arquiteto de Software
+**Jeanderson Silva** 🤓✍️
 
-Construído desde o mapeamento de arquitetura de alta performance até os deploys em nuvem (Vercel & Render), passando por segurança rigorosa de APIs e refinamento extremo de UI/UX.
+*Desenvolvedor Full-Stack | Engenheiro Frontend | Arquiteto de Software*
+
+Construído desde o mapeamento de arquitetura de streaming em tempo real (SSE) até os deploys em nuvem (Vercel & Render), passando por segurança rigorosa de APIs e refinamento extremo de UI/UX.
 
 Sinta-se à vontade para auditar as configurações de rede, explorar a lógica de streaming SSE ou testar a interatividade da aplicação ao vivo!
