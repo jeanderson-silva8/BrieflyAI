@@ -90,11 +90,15 @@ app.get('/health', (req, res) => {
 app.get('/debug/auth-check', (req, res) => {
   try {
     const authModule = require('./routes/auth');
+    const db = mongoose.connection.db;
     res.json({
       authLoaded: !!authModule,
       resendAvailable: !!process.env.RESEND_API_KEY,
+      clientUrl: process.env.CLIENT_URL || 'NOT SET',
       jwtAvailable: !!process.env.JWT_SECRET,
       mongoState: mongoose.connection.readyState,
+      dbName: db ? db.databaseName : 'N/A',
+      mongoUriPreview: process.env.MONGO_URI ? process.env.MONGO_URI.replace(/\/\/[^@]+@/, '//***@').slice(-60) : 'NOT SET',
       nodeVersion: process.version,
       env: process.env.NODE_ENV || 'not set'
     });
