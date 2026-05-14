@@ -86,6 +86,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', mongo: mongoose.connection.readyState === 1, timestamp: new Date().toISOString() });
 });
 
+// [DEBUG] Diagnóstico temporário — remover após resolver o problema
+app.get('/debug/auth-check', (req, res) => {
+  try {
+    const authModule = require('./routes/auth');
+    res.json({
+      authLoaded: !!authModule,
+      resendAvailable: !!process.env.RESEND_API_KEY,
+      jwtAvailable: !!process.env.JWT_SECRET,
+      mongoState: mongoose.connection.readyState,
+      nodeVersion: process.version,
+      env: process.env.NODE_ENV || 'not set'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message, stack: err.stack?.split('\n').slice(0, 5) });
+  }
+});
+
+// [SEGURANÇA] Global Error Handler — captura erros não tratados
+app.use((err, req, res, next) => {
+  console.error('[GLOBAL ERROR]', err.message, err.stack);
+  res.status(err.status || 500).json({ error: 'Erro interno do servidor', detail: process.env.NODE_ENV !== 'production' ? err.message : undefined });
+});
+
 // Conexão com MongoDB e start do servidor
 const startServer = () => {
   app.listen(PORT, () => {
