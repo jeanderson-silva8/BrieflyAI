@@ -3,21 +3,17 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const User = require('../models/User');
 
 const router = express.Router();
 
 // ═══════════════════════════════════════════════════════
-// 📧 Gmail SMTP — Envio de emails para QUALQUER destinatário
+// 📧 Resend API — Envio via HTTP (funciona no Render Free Tier)
+// O Render bloqueia portas SMTP (25, 465, 587).
+// O Resend usa HTTPS (porta 443) — sem bloqueio.
 // ═══════════════════════════════════════════════════════
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Garante que o banco está conectado antes de qualquer operação de auth
 function ensureDbReady(res) {
@@ -192,10 +188,10 @@ router.post('/forgot-password', async (req, res) => {
     console.log(`   Email: ${email}`);
     console.log(`   URL: ${resetUrl}\n`);
 
-    // Envia email via Gmail SMTP (Nodemailer)
+    // Envia email via Resend API (HTTP — funciona no Render Free Tier)
     try {
-      await transporter.sendMail({
-        from: `"BrieflyAI" <${process.env.GMAIL_USER}>`,
+      const { data, error } = await resend.emails.send({
+        from: 'BrieflyAI <onboarding@resend.dev>',
         to: email,
         subject: '🔐 Recuperação de Senha — BrieflyAI',
         html: `
@@ -217,7 +213,11 @@ router.post('/forgot-password', async (req, res) => {
         `
       });
 
-      console.log(`📧 [PASSWORD RESET] Email enviado com sucesso para: ${email}`);
+      if (error) {
+        console.error('[AUTH] Resend API erro:', error.message);
+      } else {
+        console.log(`📧 [PASSWORD RESET] Email enviado com sucesso para: ${email} (ID: ${data?.id})`);
+      }
     } catch (emailErr) {
       console.error('[AUTH] Falha ao enviar email:', emailErr.message);
       // Não falha a requisição — o link está no console como fallback
