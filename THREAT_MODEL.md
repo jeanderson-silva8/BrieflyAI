@@ -51,6 +51,15 @@
 | Vazamento de PII em logs de prompt | ✅ | Conteúdo do prompt não é logado |
 | Custo descontrolado | ✅ | Cap por usuário/dia |
 
+## 5b. Uploads de áudio (`/api/transcribe`)
+
+| Risco | Status | Mitigação |
+|-------|--------|-----------|
+| Upload de arquivo não-áudio (XSS/polyglot) | ✅ | Allowlist de extensão + **validação por magic bytes** (ID3, RIFF, OggS, fLaC, EBML, ftyp) |
+| Malware embutido em container de áudio | ✅ | Scan **VirusTotal v3** assíncrono antes de processar; bloqueia se ≥ 1 engine reportar malicious/suspicious |
+| Path traversal via filename | ✅ | Multer gera nome próprio; extensão sanitizada |
+| Storage exposto | ✅ | `.tmp/uploads` fora de `public/`; arquivo deletado após uso |
+
 ## 6. Itens pendentes (não mitigados ainda)
 
 - Audit log dedicado (login, logout, reset, delete).

@@ -13,6 +13,7 @@ const {
 } = require('../middleware/schemas');
 const logger = require('../utils/logger');
 const audit = require('../utils/audit');
+const { isPasswordBreached } = require('../utils/hibp');
 
 const router = express.Router();
 
@@ -40,21 +41,6 @@ function ensureDbReady(res) {
 // ═══════════════════════════════════════════════════════
 // 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — AUTH (IAM)
 // ═══════════════════════════════════════════════════════
-
-// Helpers de Sanitização
-function sanitizeString(str, maxLength = 200) {
-  if (typeof str !== 'string') return '';
-  return str.trim().slice(0, maxLength);
-}
-
-function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email) && email.length <= 254;
-}
-
-function isValidPassword(password) {
-  return typeof password === 'string' && password.length >= 6 && password.length <= 128;
-}
 
 // [SEGURANÇA] Mascara email nos logs para evitar vazamento de PII
 function maskEmail(email) {
@@ -123,6 +109,14 @@ router.post('/register', validate({ body: registerSchema }), async (req, res) =>
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({ error: 'Este e-mail já está cadastrado' });
+    }
+
+    // [SEGURANÇA] HIBP — bloqueia senhas conhecidas em vazamentos
+    const { breached, count } = await isPasswordBreached(password);
+    if (breached) {
+      return res.status(400).json({
+        error: `Esta senha aparece em ${count.toLocaleString('pt-BR')} vazamentos públicos. Escolha uma senha diferente.`
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -307,6 +301,14 @@ router.post('/reset-password/:token', validate({ params: resetPasswordParamsSche
       return res.status(400).json({ error: 'Token inválido ou expirado. Solicite um novo link de recuperação.' });
     }
 
+    // [SEGURANÇA] HIBP — bloqueia senhas conhecidas em vazamentos
+    const { breached, count } = await isPasswordBreached(password);
+    if (breached) {
+      return res.status(400).json({
+        error: `Esta senha aparece em ${count.toLocaleString('pt-BR')} vazamentos públicos. Escolha uma senha diferente.`
+      });
+    }
+
     // Atualiza senha e limpa campos de reset
     user.passwordHash = await bcrypt.hash(password, 12);
     user.resetPasswordToken = null;
@@ -419,6 +421,65 @@ router.post('/logout', async (req, res) => {
     logger.error({ err: err.name }, `Erro no logout: ${err.message}`);
     clearRefreshCookie(res);
     res.json({ message: 'Logout realizado' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// 🗑️ LGPD — Exclusão de conta e portabilidade
+// ═══════════════════════════════════════════════════════
+
+const authMiddleware = require('../middleware/authMiddleware');
+const Summary = require('../models/Summary');
+
+/**
+ * DELETE /auth/account
+ * Direito ao esquecimento (LGPD Art. 18 VI / GDPR Art. 17).
+ * - Soft-delete dos resumos do usuário
+ * - Revoga TODOS os refresh tokens
+ * - Remove o User
+ * - Audit log preservado
+ */
+router.delete('/account', authMiddleware, async (req, res) => {
+  try {
+    if (!ensureDbReady(res)) return;
+
+    await Summary.updateMany(
+      { userId: req.userId, deletedAt: null },
+      { deletedAt: new Date() }
+    );
+    await RefreshToken.updateMany({ userId: req.userId }, { isRevoked: true });
+    await User.findByIdAndDelete(req.userId);
+
+    audit(req, 'auth.logout', { userId: req.userId, metadata: { reason: 'account_deleted' } });
+
+    clearRefreshCookie(res);
+    res.json({ message: 'Conta excluída. Seus dados serão apagados definitivamente em 30 dias.' });
+  } catch (err) {
+    logger.error({ err: err.name }, `Erro em DELETE /account: ${err.message}`);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * GET /auth/account/export
+ * Portabilidade (LGPD Art. 18 V / GDPR Art. 20).
+ */
+router.get('/account/export', authMiddleware, async (req, res) => {
+  try {
+    if (!ensureDbReady(res)) return;
+    const user = await User.findById(req.userId).lean();
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+    delete user.passwordHash;
+    delete user.resetPasswordToken;
+    delete user.resetPasswordExpires;
+
+    const summaries = await Summary.find({ userId: req.userId, deletedAt: null }).lean();
+
+    res.setHeader('Content-Disposition', 'attachment; filename="brieflyai-export.json"');
+    res.json({ exportedAt: new Date().toISOString(), user, summaries });
+  } catch (err) {
+    logger.error({ err: err.name }, `Erro em GET /account/export: ${err.message}`);
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

@@ -3,7 +3,7 @@ const Groq = require('groq-sdk');
 const authMiddleware = require('../middleware/authMiddleware');
 const rateLimiter = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
-const { summarizeSchema } = require('../middleware/schemas');
+const { summarizeSchema, llmTagsOutputSchema } = require('../middleware/schemas');
 const Summary = require('../models/Summary');
 const logger = require('../utils/logger');
 
@@ -182,10 +182,15 @@ router.post('/', authMiddleware, rateLimiter, validate({ body: summarizeSchema }
           response_format: { type: 'json_object' },
           temperature: 0.1
         });
-        const meta = JSON.parse(metaRes.choices[0].message.content);
-        await Summary.findByIdAndUpdate(summary._id, { 
-          emoji: meta.emoji || '📄', 
-          tags: meta.tags || [] 
+        const raw = JSON.parse(metaRes.choices[0].message.content);
+        const parsed = llmTagsOutputSchema.safeParse(raw);
+        if (!parsed.success) {
+          logger.warn({ summaryId: summary._id }, '[SUMMARIZE] Output do LLM falhou na validação Zod — usando fallback');
+        }
+        const meta = parsed.success ? parsed.data : {};
+        await Summary.findByIdAndUpdate(summary._id, {
+          emoji: meta.emoji || '📄',
+          tags: meta.tags || []
         });
       } catch (e) {
         // [SEGURANÇA] Log Seguro

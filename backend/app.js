@@ -16,14 +16,30 @@ const historyRoutes = require('./routes/history');
 const transcribeRoutes = require('./routes/transcribe');
 const logger = require('./utils/logger');
 const requestId = require('./middleware/requestId');
+const { register: metricsRegister, metricsMiddleware } = require('./utils/metrics');
 
 const app = express();
 
-// [OBSERVABILIDADE] Correlation ID em cada request
+// [OBSERVABILIDADE] Correlation ID + métricas Prometheus
 app.use(requestId);
+app.use(metricsMiddleware);
 
-// [SEGURANÇA] Headers HTTP de proteção (Helmet)
-app.use(helmet());
+// [SEGURANÇA] Headers HTTP de proteção (Helmet) com CSP estrita.
+// A API é JSON-only — não serve HTML — então defaultSrc 'none' é seguro.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"]
+    }
+  },
+  strictTransportSecurity: { maxAge: 63072000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: 'no-referrer' },
+  crossOriginResourcePolicy: { policy: 'same-site' }
+}));
 
 // [SEGURANÇA] CORS Restrito
 const FIXED_ORIGINS = [
@@ -57,14 +73,16 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// [SEGURANÇA] Rate Limiting de Login
-const authLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Muitas tentativas de login. Aguarde 1 minuto.' }
-});
+// [SEGURANÇA] Rate Limiting de Login (desativado em testes para não envenenar a suite)
+const authLimiter = process.env.NODE_ENV === 'test'
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs: 60 * 1000,
+      max: 5,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Muitas tentativas de login. Aguarde 1 minuto.' }
+    });
 
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
@@ -76,7 +94,30 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/transcribe', transcribeRoutes);
 
-// Health check
+// Health checks (liveness vs readiness)
+app.get('/health/live', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+app.get('/health/ready', (req, res) => {
+  const mongoose = require('mongoose');
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    mongo: ready,
+    timestamp: new Date().toISOString()
+  });
+});
+// [OBSERVABILIDADE] Endpoint Prometheus — protegido por token simples (METRICS_TOKEN)
+app.get('/metrics', async (req, res) => {
+  const expected = process.env.METRICS_TOKEN;
+  if (expected && req.headers['authorization'] !== `Bearer ${expected}`) {
+    return res.status(401).end();
+  }
+  res.set('Content-Type', metricsRegister.contentType);
+  res.end(await metricsRegister.metrics());
+});
+
+// Legado — mantém /health para compatibilidade com probes existentes
 app.get('/health', (req, res) => {
   const mongoose = require('mongoose');
   res.json({ status: 'ok', mongo: mongoose.connection.readyState === 1, timestamp: new Date().toISOString() });

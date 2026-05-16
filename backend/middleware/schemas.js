@@ -83,6 +83,13 @@ const chatHistoryMessage = z.object({
   content: z.string().max(50000, 'Mensagem muito longa')
 });
 
+// ── LLM OUTPUT (validação defensiva do que vem do modelo) ──
+
+const llmTagsOutputSchema = z.object({
+  emoji: z.string().min(1).max(8).optional(),
+  tags: z.array(z.string().min(1).max(40)).max(5).optional()
+}).strict();
+
 const saveChatSchema = z.object({
   messages: z.array(chatHistoryMessage)
     .max(200, 'Máximo de 200 mensagens no histórico de chat')
@@ -98,5 +105,6 @@ module.exports = {
   chatSchema,
   historyParamsSchema,
   historyListQuerySchema,
-  saveChatSchema
+  saveChatSchema,
+  llmTagsOutputSchema
 };
