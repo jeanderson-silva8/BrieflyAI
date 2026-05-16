@@ -15,7 +15,8 @@ function authMiddleware(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // [SEGURANÇA] Allowlist explícita de algoritmos — previne ataques alg:none
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
     req.userId = decoded.userId;
     next();
   } catch (err) {

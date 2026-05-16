@@ -38,6 +38,11 @@ const summarySchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
     index: true
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+    index: true
   }
 });
 

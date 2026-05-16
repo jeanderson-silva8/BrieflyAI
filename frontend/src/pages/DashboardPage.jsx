@@ -96,7 +96,7 @@ export default function DashboardPage() {
           <div className="dashboard-columns">
             {/* Center */}
             <div className="dashboard-center">
-              <SummaryInput onSubmit={handleSummarize} isStreaming={isStreaming} disabled={false} text={inputText} onTextChange={setInputText} />
+              <SummaryInput onSubmit={handleSummarize} isStreaming={isStreaming} disabled={false} text={inputText} onTextChange={setInputText} token={token} />
               <StreamingOutput data={displayData} isStreaming={isStreaming} />
               <ChatWithDoc 
                 summaryId={activeSummary?._id || streamSummaryId}

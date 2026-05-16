@@ -14,8 +14,9 @@ export default function UsageMeter() {
     fetch(`${API_URL}/api/history`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(data => {
+        const list = Array.isArray(data) ? data : (data.items || []);
         const today = new Date().toDateString();
-        const todayCount = data.filter(s => new Date(s.createdAt).toDateString() === today).length;
+        const todayCount = list.filter(s => new Date(s.createdAt).toDateString() === today).length;
         setUsed(todayCount);
       }).catch(() => {});
   }, [token]);

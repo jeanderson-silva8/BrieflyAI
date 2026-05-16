@@ -17,14 +17,28 @@ Ele resolve o problema da latência utilizando **SSE (Server-Sent Events)** para
 Garantir a persistência da conexão em tempo real (Streaming) numa arquitetura Full-Stack serverless/PaaS, sem sacrificar a segurança. Para que a experiência de streaming funcionasse sem interrupções ou vazamento de dados, implementei duas estratégias cruciais:
 
 1. **Arquitetura de Conexão Desacoplada (Vercel + Render):** Como a Vercel corta conexões Serverless em 10s (plano gratuito), o que inviabiliza o SSE, a infraestrutura foi dividida. O Frontend estático e ultrarrápido ficou na Vercel (CDN Edge), enquanto o Backend Node.js foi orquestrado no Render.com, permitindo conexões longas de 30-60s para o streaming contínuo das palavras.
-2. **Segurança Nível Enterprise em Streams:** Aplicar o **Protocolo de Segurança Absoluto**. Proteger rotas de streaming é difícil pois elas mantêm conexões abertas. Implementei verificação JWT ultra-restrita (15 min de expiração), Helmet para proteção de headers HTTP, Rate Limiting contra ataques de força bruta, e validação rigorosa de CORS combinando variáveis de ambiente (VITE_API_URL) e fallbacks fixos para garantir que apenas o frontend oficial consumisse a API.
+2. **Segurança aplicada a streams:** proteger rotas SSE exige cuidado porque as conexões permanecem abertas. As camadas usadas aqui: JWT HS256 com `algorithms` explícito (access 15 min) + refresh token rotacionado em cookie httpOnly (7 dias) com detecção de reuso, Helmet, rate limit por IP (auth) e por usuário (resumos), CORS por allowlist + regex Vercel, validação Zod estrita (`.strict()`) em todos os inputs, error handler central via `throw` + `asyncHandler`, logs Pino estruturados com PII mascarada e correlation ID por request. Trade-offs e limitações listados abaixo.
 
 ## ✨ Principais Funcionalidades
 - **Transcrição de Áudio (Whisper LPU):** Processamento de arquivos de áudio (upload local ou microfone) transformando fala em texto em questão de segundos usando a API Groq.
 - **Streaming em Tempo Real (SSE):** Resumos e interações geradas e exibidas na tela palavra por palavra. Fim das telas de carregamento travadas.
 - **Chat Contextual com Documento:** O usuário pode conversar diretamente com o resumo gerado, fazendo perguntas específicas sobre o conteúdo, com histórico de chat persistido.
 - **Dashboard Premium (Efeito Vercel):** UI de alta fidelidade com micro-interações, feedback visual tátil, painéis translúcidos (Glassmorphism) e design focado em conversão.
-- **Autenticação Segura JWT:** Fluxo de login/cadastro encriptado (Bcrypt), com gerenciamento de sessão seguro contra ataques XSS e CSRF.
+- **Autenticação JWT + Refresh Rotation:** senhas com bcrypt cost 12; access token em memória React (mitiga XSS) + refresh httpOnly `sameSite=strict` (mitiga CSRF); revogação por família ao detectar reuso.
+
+## 📌 Trade-offs e o que NÃO está implementado (honestidade)
+
+Este é um projeto de portfólio em evolução. O que está documentado em [`THREAT_MODEL.md`](THREAT_MODEL.md), [`SECURITY.md`](SECURITY.md) e [`docs/API.md`](docs/API.md) reflete o estado real do código. Itens conscientemente NÃO feitos ainda:
+
+- Sem 2FA / MFA.
+- Sem account lockout por e-mail (só rate limit por IP em `/auth`).
+- Sem scan antivírus em uploads de áudio.
+- Sem HIBP (verificação de senha vazada) — só comprimento mínimo 8.
+- Sem CSP customizada no `vercel.json` do frontend (Helmet cobre só o backend).
+- Sem métricas/APM (Prometheus / OpenTelemetry).
+- Sem testes adversariais E2E — temos 28 testes de unidade/integração cobrindo IDOR, JWT bypass, validação Zod.
+- Sem plano de DR formal (`DISASTER_RECOVERY.md`) — depende dos backups automáticos do MongoDB Atlas.
+- Senhas com bcrypt cost 12 (não Argon2id).
 
 ## 🛠️ Stack Tecnológico & Arquitetura
 O ecossistema BrieflyAI segue uma arquitetura baseada nos protocolos construtivos A.N.T e V.L.A.E.G:
@@ -38,7 +52,7 @@ O ecossistema BrieflyAI segue uma arquitetura baseada nos protocolos construtivo
 - **Motor Lógico:** Node.js + Express.
 - **Integração AI:** Groq SDK (Modelos LLaMA 3 para texto e Whisper-large-v3 para áudio) rodando em Hardware LPU para inferência próxima de zero latência.
 - **Processamento de Áudio:** `multer` em memória para interceptação segura de uploads antes do envio à IA.
-- **Defesa Perimetral:** `helmet`, `express-rate-limit`, e CORS estrito.
+- **Defesa Perimetral:** `helmet`, `express-rate-limit`, CORS estrito, `cookie-parser`, Zod, Pino, `asyncHandler` + classes de erro, correlation ID, audit log imutável (TTL 365d), soft delete (`deletedAt`).
 
 ### 3. Banco de Dados (Fonte da Verdade)
 - **MongoDB Atlas:** Cluster em nuvem para armazenamento NoSQL de Usuários, Histórico de Resumos e Logs de Chat.

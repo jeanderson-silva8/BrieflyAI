@@ -5,6 +5,14 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { Resend } = require('resend');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
+const validate = require('../middleware/validate');
+const {
+  registerSchema, loginSchema,
+  forgotPasswordSchema, resetPasswordBodySchema, resetPasswordParamsSchema
+} = require('../middleware/schemas');
+const logger = require('../utils/logger');
+const audit = require('../utils/audit');
 
 const router = express.Router();
 
@@ -22,7 +30,7 @@ function ensureDbReady(res) {
     return false;
   }
   if (!process.env.JWT_SECRET) {
-    console.error('[AUTH] FATAL: JWT_SECRET não está definido no ambiente');
+    logger.fatal('JWT_SECRET não está definido no ambiente');
     res.status(503).json({ error: 'Serviço de autenticação mal configurado' });
     return false;
   }
@@ -48,33 +56,69 @@ function isValidPassword(password) {
   return typeof password === 'string' && password.length >= 6 && password.length <= 128;
 }
 
+// [SEGURANÇA] Mascara email nos logs para evitar vazamento de PII
+function maskEmail(email) {
+  if (!email || !email.includes('@')) return '***';
+  const [local, domain] = email.split('@');
+  const maskedLocal = local.length <= 2 ? '*'.repeat(local.length) : local[0] + '*'.repeat(local.length - 2) + local[local.length - 1];
+  return `${maskedLocal}@${domain}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// 🔄 REFRESH TOKEN — Helpers
+// ═══════════════════════════════════════════════════════
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/**
+ * Gera um refresh token seguro, salva hash no banco e retorna o token raw.
+ */
+async function generateRefreshToken(userId, familyId = null) {
+  const rawToken = crypto.randomBytes(40).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const family = familyId || crypto.randomBytes(16).toString('hex');
+
+  await RefreshToken.create({
+    userId,
+    tokenHash,
+    familyId: family,
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+  });
+
+  return { rawToken, familyId: family };
+}
+
+/**
+ * Seta o refresh token como cookie httpOnly seguro.
+ */
+function setRefreshCookie(res, rawToken) {
+  res.cookie('brieflyai_refresh', rawToken, {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: IS_PRODUCTION ? 'strict' : 'lax',
+    path: '/auth',
+    maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+  });
+}
+
+function clearRefreshCookie(res) {
+  res.clearCookie('brieflyai_refresh', {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: IS_PRODUCTION ? 'strict' : 'lax',
+    path: '/auth'
+  });
+}
+
 /**
  * POST /auth/register
  * Cria um novo usuário com email, nome e senha.
  */
-router.post('/register', async (req, res) => {
+router.post('/register', validate({ body: registerSchema }), async (req, res) => {
   try {
     if (!ensureDbReady(res)) return;
-    const email = sanitizeString(req.body.email, 254).toLowerCase();
-    const name = sanitizeString(req.body.name, 100);
-    const password = req.body.password;
-
-    // [SEGURANÇA] Validação rigorosa de inputs
-    if (!email || !name || !password) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
-    }
-
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ error: 'Formato de e-mail inválido' });
-    }
-
-    if (name.length < 2) {
-      return res.status(400).json({ error: 'Nome deve ter pelo menos 2 caracteres' });
-    }
-
-    if (!isValidPassword(password)) {
-      return res.status(400).json({ error: 'Senha deve ter entre 6 e 128 caracteres' });
-    }
+    // Zod já validou, sanitizou e transformou (trim + lowercase)
+    const { email, name, password } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -89,12 +133,19 @@ router.post('/register', async (req, res) => {
       passwordHash
     });
 
-    // [SEGURANÇA] JWT expira em 15 minutos (antes era 7 dias)
+    // [SEGURANÇA] Access Token curto (15 min) + Refresh Token longo (7 dias)
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '15m', algorithm: 'HS256' }
     );
+
+    // Gera refresh token e seta como cookie httpOnly
+    const { rawToken } = await generateRefreshToken(user._id);
+    setRefreshCookie(res, rawToken);
+
+    req.userId = user._id;
+    audit(req, 'auth.register', { targetType: 'User', targetId: user._id });
 
     res.status(201).json({
       token,
@@ -102,7 +153,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (err) {
     // [SEGURANÇA] Log Seguro — nunca expor detalhes internos
-    console.error('[AUTH] Erro no registro:', err.name, '-', err.message);
+    logger.error({ err: err.name }, `Erro no registro: ${err.message}`);
     if (err.code === 11000) {
       return res.status(409).json({ error: 'Este e-mail já está cadastrado' });
     }
@@ -114,40 +165,44 @@ router.post('/register', async (req, res) => {
  * POST /auth/login
  * Valida credenciais e retorna JWT (expiração 15 minutos).
  */
-router.post('/login', async (req, res) => {
+router.post('/login', validate({ body: loginSchema }), async (req, res) => {
   try {
     if (!ensureDbReady(res)) return;
-    const email = sanitizeString(req.body.email, 254).toLowerCase();
-    const password = req.body.password;
-
-    // [SEGURANÇA] Validação de inputs
-    if (!isValidEmail(email) || !isValidPassword(password)) {
-      return res.status(400).json({ error: 'Credenciais inválidas' });
-    }
+    // Zod já validou e transformou
+    const { email, password } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
+      audit(req, 'auth.login.failure', { metadata: { reason: 'unknown_email' } });
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      audit(req, 'auth.login.failure', { userId: user._id, metadata: { reason: 'bad_password' } });
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
-    // [SEGURANÇA] JWT expira em 15 minutos
+    // [SEGURANÇA] Access Token curto (15 min) + Refresh Token longo (7 dias)
     const token = jwt.sign(
       { userId: user._id },
       process.env.JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '15m', algorithm: 'HS256' }
     );
+
+    // Gera refresh token e seta como cookie httpOnly
+    const { rawToken } = await generateRefreshToken(user._id);
+    setRefreshCookie(res, rawToken);
+
+    req.userId = user._id;
+    audit(req, 'auth.login.success', { targetType: 'User', targetId: user._id });
 
     res.json({
       token,
       user: { id: user._id, email: user.email, name: user.name }
     });
   } catch (err) {
-    console.error('[AUTH] Erro no login:', err.name, '-', err.message);
+    logger.error({ err: err.name }, `Erro no login: ${err.message}`);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -156,20 +211,17 @@ router.post('/login', async (req, res) => {
  * POST /auth/forgot-password
  * Gera token de recuperação, salva hash no banco, envia email via Gmail SMTP.
  */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validate({ body: forgotPasswordSchema }), async (req, res) => {
   try {
     if (!ensureDbReady(res)) return;
-    const email = sanitizeString(req.body.email, 254).toLowerCase();
-
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ error: 'Formato de e-mail inválido' });
-    }
+    const { email } = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
       // [SEGURANÇA] Retorna sucesso mesmo se o email não existir
       return res.json({ message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.' });
     }
+    audit(req, 'auth.password.reset_requested', { userId: user._id, targetType: 'User', targetId: user._id });
 
     // Gera token crypto seguro de 32 bytes
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -183,10 +235,12 @@ router.post('/forgot-password', async (req, res) => {
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
     const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
 
-    // Log no console (útil para debug)
-    console.log(`\n🔑 [PASSWORD RESET] Link de recuperação gerado:`);
-    console.log(`   Email: ${email}`);
-    console.log(`   URL: ${resetUrl}\n`);
+    // [SEGURANÇA] Log seguro — mascara email, nunca loga URL de reset em produção
+    if (process.env.NODE_ENV !== 'production') {
+      logger.info({ email: maskEmail(email), url: resetUrl }, 'Password reset link gerado');
+    } else {
+      logger.info({ email: maskEmail(email) }, 'Password reset solicitado');
+    }
 
     // Envia email via Resend API (HTTP — funciona no Render Free Tier)
     try {
@@ -214,18 +268,18 @@ router.post('/forgot-password', async (req, res) => {
       });
 
       if (error) {
-        console.error('[AUTH] Resend API erro:', error.message);
+        logger.error({ err: error.message }, 'Resend API erro');
       } else {
-        console.log(`📧 [PASSWORD RESET] Email enviado com sucesso para: ${email} (ID: ${data?.id})`);
+        logger.info({ email: maskEmail(email), resendId: data?.id }, 'Email de reset enviado');
       }
     } catch (emailErr) {
-      console.error('[AUTH] Falha ao enviar email:', emailErr.message);
+      logger.error({ err: emailErr.message }, 'Falha ao enviar email de reset');
       // Não falha a requisição — o link está no console como fallback
     }
 
     res.json({ message: 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.' });
   } catch (err) {
-    console.error('[AUTH] Erro no forgot-password:', err.name, '-', err.message);
+    logger.error({ err: err.name }, `Erro no forgot-password: ${err.message}`);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -234,20 +288,12 @@ router.post('/forgot-password', async (req, res) => {
  * POST /auth/reset-password/:token
  * Valida token, verifica expiração, atualiza senha.
  */
-router.post('/reset-password/:token', async (req, res) => {
+router.post('/reset-password/:token', validate({ params: resetPasswordParamsSchema, body: resetPasswordBodySchema }), async (req, res) => {
   try {
     if (!ensureDbReady(res)) return;
     const { token } = req.params;
     const { password } = req.body;
     const tokenStr = Array.isArray(token) ? token[0] : token;
-
-    if (!tokenStr || !password) {
-      return res.status(400).json({ error: 'Token e senha são obrigatórios' });
-    }
-
-    if (!isValidPassword(password)) {
-      return res.status(400).json({ error: 'Senha deve ter entre 6 e 128 caracteres' });
-    }
 
     // Gera hash do token recebido para comparar com o banco
     const tokenHash = crypto.createHash('sha256').update(tokenStr).digest('hex');
@@ -267,14 +313,113 @@ router.post('/reset-password/:token', async (req, res) => {
     user.resetPasswordExpires = null;
     await user.save();
 
-    console.log(`✅ [PASSWORD RESET] Senha redefinida com sucesso para: ${user.email}`);
+    audit(req, 'auth.password.reset_completed', { userId: user._id, targetType: 'User', targetId: user._id });
+    logger.info({ email: maskEmail(user.email) }, 'Senha redefinida com sucesso');
 
     res.json({ message: 'Senha redefinida com sucesso! Faça login com sua nova senha.' });
   } catch (err) {
-    console.error('[AUTH] Erro no reset-password:', err.name, '-', err.message);
+    logger.error({ err: err.name }, `Erro no reset-password: ${err.message}`);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
-module.exports = router;
+// ═══════════════════════════════════════════════════════
+// 🔄 REFRESH TOKEN — Endpoints
+// ═══════════════════════════════════════════════════════
 
+/**
+ * POST /auth/refresh
+ * Usa o refresh token do cookie httpOnly para emitir um novo access token.
+ * Implementa Refresh Token Rotation: cada uso gera um novo refresh token.
+ * Detecta reuso de token revogado (possível roubo) e revoga toda a família.
+ */
+router.post('/refresh', async (req, res) => {
+  try {
+    if (!ensureDbReady(res)) return;
+
+    const rawToken = req.cookies?.brieflyai_refresh;
+    if (!rawToken) {
+      return res.status(401).json({ error: 'Refresh token ausente' });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const storedToken = await RefreshToken.findOne({ tokenHash });
+
+    // Token não encontrado no banco
+    if (!storedToken) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Refresh token inválido' });
+    }
+
+    // [SEGURANÇA] Detecção de reuso — possível roubo de token
+    if (storedToken.isRevoked) {
+      // Revoga TODA a família (todos os tokens derivados)
+      await RefreshToken.updateMany(
+        { familyId: storedToken.familyId },
+        { isRevoked: true }
+      );
+      clearRefreshCookie(res);
+      audit(req, 'auth.refresh.reuse_detected', { userId: storedToken.userId, metadata: { familyId: storedToken.familyId } });
+      logger.warn({ familyId: storedToken.familyId, userId: storedToken.userId }, 'ALERTA: Reuso de refresh token detectado! Família revogada');
+      return res.status(401).json({ error: 'Sessão comprometida. Faça login novamente.' });
+    }
+
+    // Token expirado
+    if (storedToken.expiresAt < new Date()) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    }
+
+    // Verifica se o usuário ainda existe
+    const user = await User.findById(storedToken.userId);
+    if (!user) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Usuário não encontrado' });
+    }
+
+    // [ROTATION] Revoga o token atual e emite um novo na mesma família
+    storedToken.isRevoked = true;
+    await storedToken.save();
+
+    const { rawToken: newRawToken } = await generateRefreshToken(user._id, storedToken.familyId);
+    setRefreshCookie(res, newRawToken);
+
+    // Novo access token
+    const accessToken = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m', algorithm: 'HS256' }
+    );
+
+    res.json({
+      token: accessToken,
+      user: { id: user._id, email: user.email, name: user.name }
+    });
+  } catch (err) {
+    logger.error({ err: err.name }, `Erro no refresh: ${err.message}`);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * POST /auth/logout
+ * Revoga o refresh token atual e limpa o cookie.
+ */
+router.post('/logout', async (req, res) => {
+  try {
+    const rawToken = req.cookies?.brieflyai_refresh;
+    if (rawToken) {
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const revoked = await RefreshToken.findOneAndUpdate({ tokenHash }, { isRevoked: true });
+      if (revoked) audit(req, 'auth.logout', { userId: revoked.userId });
+    }
+    clearRefreshCookie(res);
+    res.json({ message: 'Logout realizado com sucesso' });
+  } catch (err) {
+    logger.error({ err: err.name }, `Erro no logout: ${err.message}`);
+    clearRefreshCookie(res);
+    res.json({ message: 'Logout realizado' });
+  }
+});
+
+module.exports = router;

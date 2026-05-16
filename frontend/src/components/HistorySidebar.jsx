@@ -23,7 +23,10 @@ export default function HistorySidebar({ onSelectSummary, onNewSummary, activeSu
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/api/history`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setHistory(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(Array.isArray(data) ? data : (data.items || []));
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
