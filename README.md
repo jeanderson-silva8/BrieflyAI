@@ -4,6 +4,7 @@ Plataforma Full-Stack B2B de Resumos Inteligentes e Transcrição em Tempo Real 
 ![React](https://img.shields.io/badge/React-19-blue?logo=react) ![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=node.js) ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb) ![Groq](https://img.shields.io/badge/Groq-LPU_Engine-f55036) ![Vercel](https://img.shields.io/badge/Vercel-Deploy-black?logo=vercel) ![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions)
 
 🟢 **LIVE DEMO:** [Acesse o BrieflyAI Ao Vivo Aqui](https://briefly-ai-nine.vercel.app/)
+🛡️ **Auditoria Enterprise:** [Veja a Auditoria de Segurança Aplicada a Este Projeto](docs/AUDIT_REPORT_2026-05-16.md)
 
 ## 🛑 O Problema
 Profissionais e empresas perdem horas processando gravações longas de reuniões, aulas ou documentos extensos. Ferramentas tradicionais de IA sofrem do "efeito carregamento cego": o usuário envia um áudio grande ou um texto enorme e fica olhando para um _spinner_ por minutos até o servidor devolver o resultado completo. Muitas vezes a conexão cai (timeout) antes de qualquer resposta chegar, destruindo a experiência.
