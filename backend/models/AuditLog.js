@@ -18,8 +18,12 @@ const auditLogSchema = new mongoose.Schema({
       'auth.refresh.reuse_detected',
       'auth.password.reset_requested',
       'auth.password.reset_completed',
+      'account.delete',
+      'account.export',
+      'summary.create',
       'summary.delete',
-      'summary.create'
+      'chat.message',
+      'transcribe.attempt'
     ],
     index: true
   },

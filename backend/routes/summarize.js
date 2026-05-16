@@ -6,6 +6,7 @@ const validate = require('../middleware/validate');
 const { summarizeSchema, llmTagsOutputSchema } = require('../middleware/schemas');
 const Summary = require('../models/Summary');
 const logger = require('../utils/logger');
+const audit = require('../utils/audit');
 
 const router = express.Router();
 
@@ -167,6 +168,7 @@ router.post('/', authMiddleware, rateLimiter, validate({ body: summarizeSchema }
     });
 
     // Enviar evento final com o ID do resumo salvo
+    audit(req, 'summary.create', { targetType: 'Summary', targetId: summary._id });
     res.write(`data: ${JSON.stringify({ content: '', done: true, summaryId: summary._id })}\n\n`);
     res.end();
 

@@ -14,6 +14,7 @@ const {
 const logger = require('../utils/logger');
 const audit = require('../utils/audit');
 const { isPasswordBreached } = require('../utils/hibp');
+const csrfCheck = require('../middleware/csrfCheck');
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ function ensureDbReady(res) {
 }
 
 // ═══════════════════════════════════════════════════════
-// 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — AUTH (IAM)
+// Camada de autenticação — bcrypt + JWT HS256 + refresh rotation
 // ═══════════════════════════════════════════════════════
 
 // [SEGURANÇA] Mascara email nos logs para evitar vazamento de PII
@@ -335,7 +336,7 @@ router.post('/reset-password/:token', validate({ params: resetPasswordParamsSche
  * Implementa Refresh Token Rotation: cada uso gera um novo refresh token.
  * Detecta reuso de token revogado (possível roubo) e revoga toda a família.
  */
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', csrfCheck, async (req, res) => {
   try {
     if (!ensureDbReady(res)) return;
 
@@ -407,7 +408,7 @@ router.post('/refresh', async (req, res) => {
  * POST /auth/logout
  * Revoga o refresh token atual e limpa o cookie.
  */
-router.post('/logout', async (req, res) => {
+router.post('/logout', csrfCheck, async (req, res) => {
   try {
     const rawToken = req.cookies?.brieflyai_refresh;
     if (rawToken) {
@@ -450,7 +451,7 @@ router.delete('/account', authMiddleware, async (req, res) => {
     await RefreshToken.updateMany({ userId: req.userId }, { isRevoked: true });
     await User.findByIdAndDelete(req.userId);
 
-    audit(req, 'auth.logout', { userId: req.userId, metadata: { reason: 'account_deleted' } });
+    audit(req, 'account.delete', { userId: req.userId, targetType: 'User', targetId: req.userId });
 
     clearRefreshCookie(res);
     res.json({ message: 'Conta excluída. Seus dados serão apagados definitivamente em 30 dias.' });
@@ -475,6 +476,7 @@ router.get('/account/export', authMiddleware, async (req, res) => {
 
     const summaries = await Summary.find({ userId: req.userId, deletedAt: null }).lean();
 
+    audit(req, 'account.export', { userId: req.userId, targetType: 'User', targetId: req.userId });
     res.setHeader('Content-Disposition', 'attachment; filename="brieflyai-export.json"');
     res.json({ exportedAt: new Date().toISOString(), user, summaries });
   } catch (err) {

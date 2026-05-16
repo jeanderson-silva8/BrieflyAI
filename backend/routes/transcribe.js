@@ -7,9 +7,10 @@ const path = require('path');
 const authMiddleware = require('../middleware/authMiddleware');
 const logger = require('../utils/logger');
 const { scanFile } = require('../utils/virustotal');
+const audit = require('../utils/audit');
 
 // ═══════════════════════════════════════════════════════
-// 🛡️ PROTOCOLO DE SEGURANÇA ENTERPRISE — UPLOAD DE ÁUDIO
+// Upload de áudio — allowlist + magic bytes + scan VirusTotal
 // ═══════════════════════════════════════════════════════
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
@@ -62,6 +63,7 @@ router.post('/', authMiddleware, upload.single('audio'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
     }
+    audit(req, 'transcribe.attempt', { metadata: { size: req.file.size, mime: req.file.mimetype } });
 
     const filePath = req.file.path;
 

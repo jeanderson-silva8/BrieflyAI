@@ -37,7 +37,10 @@ mongoose.connect(process.env.MONGO_URI, {
     startServer();
   })
   .catch((err) => {
-    logger.warn('MongoDB não conectou. Verifique MONGO_URI no .env');
-    logger.warn('Iniciando servidor SEM banco de dados (modo offline)...');
+    if (process.env.NODE_ENV === 'production') {
+      logger.fatal({ err: err.message }, 'BOOT FATAL — MongoDB não conectou em produção. Abortando.');
+      process.exit(1);
+    }
+    logger.warn({ err: err.message }, 'MongoDB não conectou — modo offline (dev apenas)');
     startServer();
   });

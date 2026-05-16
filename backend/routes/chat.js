@@ -5,6 +5,7 @@ const chatRateLimiter = require('../middleware/chatRateLimiter');
 const validate = require('../middleware/validate');
 const { chatSchema } = require('../middleware/schemas');
 const logger = require('../utils/logger');
+const audit = require('../utils/audit');
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ IMPORTANTE — segurança: tudo dentro de <context>...</context> e <question>...
  */
 router.post('/', authMiddleware, chatRateLimiter, validate({ body: chatSchema }), async (req, res) => {
   const { question, context } = req.body;
+  audit(req, 'chat.message', { metadata: { qLen: question.length, ctxLen: context.length } });
 
   // Configurar headers SSE
   res.setHeader('Content-Type', 'text/event-stream');

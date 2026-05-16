@@ -9,6 +9,22 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
  */
 const logger = pino({
   level: process.env.LOG_LEVEL || (IS_PRODUCTION ? 'info' : 'debug'),
+  // [SEGURANÇA] Redação automática — defesa em profundidade. Mesmo se alguém
+  // logar req.body por acidente, senha/token nunca chegam ao log.
+  redact: {
+    paths: [
+      'password', '*.password', '*.*.password',
+      'passwordHash', '*.passwordHash',
+      'token', '*.token', '*.*.token',
+      'accessToken', 'refreshToken', '*.accessToken', '*.*.refreshToken',
+      'rawToken', '*.rawToken',
+      'authorization', 'req.headers.authorization', 'headers.authorization',
+      'cookie', 'req.headers.cookie', 'headers.cookie',
+      'apiKey', '*.apiKey',
+      'resetPasswordToken', '*.resetPasswordToken'
+    ],
+    censor: '[REDACTED]'
+  },
   ...(IS_PRODUCTION
     ? {
         // JSON puro para produção (Datadog, ELK, CloudWatch)
