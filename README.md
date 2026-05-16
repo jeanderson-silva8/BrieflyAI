@@ -133,29 +133,7 @@ No BrieflyAI, as sessões seguem um protocolo desenhado para resistir aos vetore
 ├── SECURITY.md        # Política de disclosure
 ├── THREAT_MODEL.md    # STRIDE + mitigações
 └── README.md
-```
 
-## 🚀 Como Executar Localmente
-
-### 1. Requisitos
-- Node.js v20+
-- MongoDB local ou MongoDB Atlas
-- Chave de API da Groq (`GROQ_API_KEY`)
-
-### 2. Backend
-```bash
-cd backend
-cp .env.example .env   # preencha JWT_SECRET, MONGO_URI, GROQ_API_KEY
-npm install
-npm run dev            # http://localhost:3001
-npm test               # roda a suíte de 28 testes
-```
-
-### 3. Frontend
-```bash
-cd frontend
-npm install
-npm run dev            # http://localhost:5173
 ```
 
 ## 👑 Autor
