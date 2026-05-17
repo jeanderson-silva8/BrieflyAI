@@ -70,7 +70,7 @@ CI roda em [`.github/workflows/ci.yml`](.github/workflows/ci.yml): build, test e
 | Observabilidade | `/metrics` Prometheus (protegido por `METRICS_TOKEN`) + correlation ID end-to-end + React Error Boundary | ✅ |
 | Container | Dockerfile multi-stage, Alpine, usuário não-root, `.dockerignore` | ✅ |
 
-**O que NÃO está implementado (transparência):**
+**O que NÃO está implementado:**
 
 - MFA / 2FA
 - Account lockout por e-mail (apenas rate limit por IP em `/auth`)
