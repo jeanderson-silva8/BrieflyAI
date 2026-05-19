@@ -48,7 +48,10 @@ Cobertura de cenários adversariais:
 
 CI roda em [`.github/workflows/ci.yml`](.github/workflows/ci.yml): build, test e `npm audit` em backend e frontend a cada PR.
 
-## 🔒 Segurança
+<a id="seg-camadas"></a>
+## 🔒 Segurança — camadas e status
+
+> *Tabela scannável: o que existe em cada camada, com âncora no código. Para entender o **encadeamento** de auth (como JWT em memória + refresh httpOnly + rotation + family revoke trabalham juntos contra XSS/CSRF/roubo de token), ver a seção [Arquitetura de Auth](#arq-auth) abaixo.*
 
 | Camada | Implementação | Status |
 |---|---|---|
@@ -89,7 +92,11 @@ Para reportar vulnerabilidades, veja [`SECURITY.md`](SECURITY.md). Para modelage
 - **Dashboard Premium (Efeito Vercel):** UI de alta fidelidade com micro-interações, Glassmorphism e dark mode.
 - **Direito LGPD:** endpoints `DELETE /auth/account` (esquecimento) e `GET /auth/account/export` (portabilidade).
 
-## 🔒 Arquitetura de Autenticação e Sessão Segura
+<a id="arq-auth"></a>
+## 🔒 Arquitetura de Auth — como o fluxo resiste a XSS, CSRF e roubo de token (o porquê e o encadeamento)
+
+> *Deep-dive narrativo: por que cada peça existe e como as peças se encadeiam. A tabela [Segurança — camadas e status](#seg-camadas) acima lista o **que** existe; esta seção explica **por que** assim.*
+
 
 No BrieflyAI, as sessões seguem um protocolo desenhado para resistir aos vetores clássicos de XSS, CSRF e roubo de token:
 
