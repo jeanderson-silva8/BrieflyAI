@@ -144,6 +144,54 @@ No BrieflyAI, as sessões seguem um protocolo desenhado para resistir aos vetore
 
 ```
 
+## 🚀 Como Executar Localmente
+
+### Requisitos
+- Node.js 20+
+- npm 10+
+- MongoDB instalado localmente ou conta Atlas
+- API Key do Groq SDK
+
+### Variáveis de ambiente
+
+Crie um arquivo `.env` na pasta `backend` com as variáveis necessárias:
+
+```dotenv
+MONGODB_URI=sua_uri_do_mongodb
+GROQ_API_KEY=sua_chave_groq_sdk_aqui
+PORT=5000
+JWT_SECRET=sua_chave_secreta_jwt
+```
+
+⚠️ **Nunca commite o `.env`.**
+
+### Rodando
+
+Abra dois terminais distintos na raiz do projeto para rodar o backend e o frontend em paralelo:
+
+**Terminal 1 (Backend):**
+```bash
+cd backend
+npm install
+npm run dev     # backend executando em http://localhost:5000
+```
+
+**Terminal 2 (Frontend):**
+```bash
+cd frontend
+npm install
+npm run dev     # frontend Vite executando em http://localhost:5173
+```
+
+### Testes
+
+Para rodar os testes do backend:
+
+```bash
+cd backend
+npm run test
+```
+
 ## 👑 Autor
 
 **Jeanderson Silva** 🤓✍️
