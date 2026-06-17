@@ -6,6 +6,15 @@ Plataforma Full-Stack B2B de Resumos Inteligentes e Transcrição em Tempo Real 
 🟢 **LIVE DEMO:** [Acesse o BrieflyAI Ao Vivo Aqui](https://briefly-ai-nine.vercel.app/)
 🛡️ **Auditoria Enterprise:** [Veja a Auditoria de Segurança Aplicada a Este Projeto](docs/AUDIT_REPORT_2026-05-16.md)
 
+<div align="center">
+  <div style="max-width: 800px; background-color: #161b22; border: 1px solid #30363d; border-bottom: none; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 10px; font-family: monospace; font-size: 13px; color: #8b949e; text-align: left;">
+    🔴 &nbsp; 🟡 &nbsp; 🟢 &nbsp;&nbsp;&nbsp; <b>~/brieflyai</b>
+  </div>
+  <div style="max-width: 800px; border: 1px solid #30363d; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow: hidden; line-height: 0;">
+    <img src="assets/brieflyai.gif" width="100%" height="auto" alt="BrieflyAI Demo" />
+  </div>
+</div>
+
 ## 🛑 O Problema
 Profissionais e empresas perdem horas processando gravações longas de reuniões, aulas ou documentos extensos. Ferramentas tradicionais de IA sofrem do "efeito carregamento cego": o usuário envia um áudio grande ou um texto enorme e fica olhando para um _spinner_ por minutos até o servidor devolver o resultado completo. Muitas vezes a conexão cai (timeout) antes de qualquer resposta chegar, destruindo a experiência.
 
