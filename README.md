@@ -8,7 +8,7 @@ Plataforma Full-Stack B2B de Resumos Inteligentes e Transcrição em Tempo Real 
 
 <div align="center">
   <div style="max-width: 800px; background-color: #161b22; border: 1px solid #30363d; border-bottom: none; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 10px; font-family: monospace; font-size: 13px; color: #8b949e; text-align: left;">
-    🔴 &nbsp; 🟡 &nbsp; 🟢 &nbsp;&nbsp;&nbsp; <b>~/brieflyai</b>
+
   </div>
   <div style="max-width: 800px; border: 1px solid #30363d; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; overflow: hidden; line-height: 0;">
     <img src="assets/brieflyai.gif" width="100%" height="auto" alt="BrieflyAI Demo" />
